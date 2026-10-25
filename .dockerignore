@@ -1,4 +1,9 @@
 .git
+.vscode
+.idea
+.agents
+.codex
+.aws
 .env
 .env.*
 !.env.example
