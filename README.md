@@ -15,18 +15,38 @@ tripgoctl environment start
 tripgoctl connect
 ```
 
-Оставьте `tripgoctl connect` работающим. Используйте созданный окружением `.env`:
+Используйте `.env`, созданный командой `tripgoctl environment start`:
 `DATABASE_URL` должен указывать на PostgreSQL, доступный с вашего компьютера.
 Не заменяйте его адрес и пароль значениями из `.env.example`.
 Переменные окружения имеют приоритет над `.env` в Go-приложении.
 
+Подготовьте зависимости и примените миграции:
+
 ```bash
 go mod download
 make migrate
+```
+
+Затем выберите один способ запуска. Оба используют сгенерированный `.env`
+без ручного изменения адреса БД.
+
+Локально:
+
+```bash
 make run
 ```
 
-Сервис слушает `HTTP_ADDR` (по умолчанию `:8080`). Остановка — Ctrl+C или SIGTERM.
+Сервис слушает `HTTP_ADDR` (по умолчанию `:8080`).
+
+В Docker Desktop:
+
+```bash
+make docker-run
+```
+
+Сервис доступен на `http://localhost:8001`. Команда сама собирает образ и
+подменяет адрес БД только в окружении контейнера; файл `.env` остаётся прежним.
+Подробнее о настройках Docker — ниже. Остановка — Ctrl+C или SIGTERM.
 
 ## Конфигурация
 
@@ -118,14 +138,23 @@ make test-integration      # включая PostgreSQL
 После запуска окружения и применения миграций:
 
 ```bash
-docker build -t tripgo .
-docker run --rm -p 8001:8080 --env-file .env -e HTTP_ADDR=:8080 tripgo
+make docker-run
 curl -i localhost:8001/ready
 ```
 
-Для Docker Desktop укажите в передаваемом контейнеру `DATABASE_URL` адрес
-`host.docker.internal` вместо `localhost`, сохранив порт и реквизиты окружения.
-Миграции с компьютера запускайте с доступным ему адресом БД.
+`make docker-run` собирает образ и запускает сервис в Docker Desktop.
+Цель берёт `DATABASE_URL` из конфигурации Make и заменяет хост `localhost` или
+`127.0.0.1` с явно указанным портом на `host.docker.internal` только для
+контейнера. Порт, реквизиты и параметры подключения сохраняются; `.env` не меняется.
+`make migrate` и `make run` продолжают использовать исходный адрес.
+Для PostgreSQL в локальном окружении сначала выполните `tripgoctl environment start`.
+
+По умолчанию образ называется `tripgo`, HTTP доступен на порту `8001`.
+Их можно изменить: `make docker-run DOCKER_IMAGE=tripgo-dev DOCKER_PORT=8002`.
+Только сборка: `make docker-build`.
+Для другой сети передайте полный адрес через переменную `DOCKER_DATABASE_URL`.
+В обычном Docker Engine на Linux автоматическая замена хоста не гарантирует
+доступ к БД: укажите адрес, доступный из контейнера, через `DOCKER_DATABASE_URL`.
 Ожидаемый ответ `/ready` — `200`, `{"status":"ok"}`.
 
 Сборка многостадийная, итоговый образ — `distroless/static-debian12:nonroot`,
