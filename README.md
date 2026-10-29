@@ -27,8 +27,7 @@ go mod download
 make migrate
 ```
 
-Затем выберите один способ запуска. Оба используют сгенерированный `.env`
-без ручного изменения адреса БД.
+Затем выберите один способ запуска. Файл `.env` менять не нужно.
 
 Локально:
 
@@ -41,11 +40,11 @@ make run
 В Docker Desktop:
 
 ```bash
-make docker-run
+DOCKER_DATABASE_URL="<адрес PostgreSQL, доступный из контейнера>" make docker-run
 ```
 
-Сервис доступен на `http://localhost:8001`. Команда сама собирает образ и
-подменяет адрес БД только в окружении контейнера; файл `.env` остаётся прежним.
+Сервис доступен на `http://localhost:8001`. Команда собирает образ и передаёт
+`DOCKER_DATABASE_URL` как адрес БД контейнеру; файл `.env` остаётся прежним.
 Подробнее о настройках Docker — ниже. Остановка — Ctrl+C или SIGTERM.
 
 ## Конфигурация
@@ -106,16 +105,12 @@ curl -i -X POST 'localhost:8080/api/v1/trips/<id>/finish'
 ## Проверки и команды
 
 ```bash
-make build                 # go build ./...
-make test                  # go test -race ./...
-make test-integration      # включая PostgreSQL
+make build
+make test
 ```
 
-Интеграционные тесты используют `TEST_DATABASE_URL` либо `DATABASE_URL`
-из окружения / `.env`. Нужны права CREATE SCHEMA: тесты создают отдельную схему,
-проверяют миграции Up → Down → Up, транзакции, историю, конкурентные запросы и HTTP,
-затем удаляют свою схему. Обычный `make test` проверки БД пропускает.
-Цель `make lint` пока отсутствует.
+Автоматические тесты в первой лабораторной не добавлены.
+`make test` оставлен для следующих работ. Цель `make lint` пока отсутствует.
 
 `make generate` обновляет OpenAPI-код; результат коммитится и вручную не правится.
 `make migrate-status` показывает миграции; `make migrate-down` откатывает последнюю
@@ -138,23 +133,17 @@ make test-integration      # включая PostgreSQL
 После запуска окружения и применения миграций:
 
 ```bash
-make docker-run
+DOCKER_DATABASE_URL="<адрес PostgreSQL, доступный из контейнера>" make docker-run
 curl -i localhost:8001/ready
 ```
 
-`make docker-run` собирает образ и запускает сервис в Docker Desktop.
-Цель берёт `DATABASE_URL` из конфигурации Make и заменяет хост `localhost` или
-`127.0.0.1` с явно указанным портом на `host.docker.internal` только для
-контейнера. Порт, реквизиты и параметры подключения сохраняются; `.env` не меняется.
-`make migrate` и `make run` продолжают использовать исходный адрес.
-Для PostgreSQL в локальном окружении сначала выполните `tripgoctl environment start`.
-
-По умолчанию образ называется `tripgo`, HTTP доступен на порту `8001`.
-Их можно изменить: `make docker-run DOCKER_IMAGE=tripgo-dev DOCKER_PORT=8002`.
-Только сборка: `make docker-build`.
-Для другой сети передайте полный адрес через переменную `DOCKER_DATABASE_URL`.
-В обычном Docker Engine на Linux автоматическая замена хоста не гарантирует
-доступ к БД: укажите адрес, доступный из контейнера, через `DOCKER_DATABASE_URL`.
+`make docker-run` собирает образ `tripgo` и запускает сервис на порту `8001`.
+Передайте в `DOCKER_DATABASE_URL` строку подключения из сгенерированного `.env`,
+заменив хост на доступный из контейнера. Для Docker Desktop вместо `localhost`
+используйте `host.docker.internal`; порт, пользователя, пароль и имя БД сохраните.
+В Docker Engine на Linux укажите адрес, доступный из сети контейнера.
+`.env` не меняется: `make migrate` и `make run` используют исходный адрес.
+Только сборка образа: `make docker-build`.
 Ожидаемый ответ `/ready` — `200`, `{"status":"ok"}`.
 
 Сборка многостадийная, итоговый образ — `distroless/static-debian12:nonroot`,
