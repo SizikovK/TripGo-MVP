@@ -1,0 +1,12 @@
+.git
+.vscode
+.idea
+.agents
+.codex
+.aws
+.env
+.env.*
+!.env.example
+.tripgo
+bin
+**/*_test.go
