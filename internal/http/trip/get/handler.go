@@ -2,12 +2,14 @@ package get
 
 import (
 	"context"
-	"github.com/SizikovK/TripGo-MVP/internal/http/response"
-	"github.com/SizikovK/TripGo-MVP/internal/http/trip"
-	"github.com/google/uuid"
 	"log/slog"
 	"net/http"
 	"time"
+
+	"github.com/google/uuid"
+
+	"github.com/SizikovK/TripGo-MVP/internal/http/response"
+	"github.com/SizikovK/TripGo-MVP/internal/http/trip"
 )
 
 type Handler struct {

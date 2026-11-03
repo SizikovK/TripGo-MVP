@@ -6,9 +6,10 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/SizikovK/TripGo-MVP/internal/domain/trip"
 	"github.com/SizikovK/TripGo-MVP/internal/model"
-	"github.com/google/uuid"
 )
 
 type Usecase struct {

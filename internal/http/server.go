@@ -56,22 +56,28 @@ func NewServer(cfg *config.Config, dependencies Dependencies) (*http.Server, err
 	if err != nil {
 		return nil, err
 	}
-	return &http.Server{Addr: cfg.HttpAddr, Handler: handler, ReadTimeout: cfg.ServerReadTimeout, ReadHeaderTimeout: cfg.ServerReadHeaderTimeout,
-		WriteTimeout: cfg.ServerWriteTimeout, IdleTimeout: cfg.ServerIdleTimeout}, nil
+	return &http.Server{
+		Addr: cfg.HttpAddr, Handler: handler, ReadTimeout: cfg.ServerReadTimeout, ReadHeaderTimeout: cfg.ServerReadHeaderTimeout,
+		WriteTimeout: cfg.ServerWriteTimeout, IdleTimeout: cfg.ServerIdleTimeout,
+	}, nil
 }
 
 func (h *handlers) CreateTrip(w http.ResponseWriter, r *http.Request, _ api.CreateTripParams) {
 	h.dependencies.Create.Handle(w, r)
 }
+
 func (h *handlers) GetTrip(w http.ResponseWriter, r *http.Request, id api.TripId) {
 	h.dependencies.Get.Handle(w, r, id)
 }
+
 func (h *handlers) FinishTrip(w http.ResponseWriter, r *http.Request, id api.TripId) {
 	h.dependencies.Finish.Handle(w, r, id)
 }
+
 func (h *handlers) Health(w http.ResponseWriter, r *http.Request) {
 	response.JSON(w, r, h.dependencies.Logger, http.StatusOK, api.HealthResponse{Status: api.Ok})
 }
+
 func (h *handlers) Ready(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
