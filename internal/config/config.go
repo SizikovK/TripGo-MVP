@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -24,8 +25,8 @@ type Config struct {
 	LogLevel                string
 	ShutdownTimeout         time.Duration
 	DatabaseUrl             string
-	DatabaseMaxConns        int
-	DatabaseMinConns        int
+	DatabaseMaxConns        int32
+	DatabaseMinConns        int32
 	DatabaseConnectTimeout  time.Duration
 	DatabaseQueryTimeout    time.Duration
 	DatabaseMaxConnLifetime time.Duration
@@ -71,6 +72,10 @@ func fromEnv(getenv func(string) string) (*Config, error) {
 	cfg.OTelMetricInterval = time.Duration(interval) * time.Millisecond
 	if cfg.OTelEndpoint == "" {
 		return nil, errors.New("OTEL_EXPORTER_OTLP_ENDPOINT обязателен")
+	}
+	endpoint, err := url.Parse(cfg.OTelEndpoint)
+	if err != nil || endpoint.Host == "" || (endpoint.Scheme != "http" && endpoint.Scheme != "https") {
+		return nil, errors.New("OTEL_EXPORTER_OTLP_ENDPOINT должен быть HTTP или HTTPS URL")
 	}
 	if cfg.OTelProtocol != "grpc" && cfg.OTelProtocol != "http/protobuf" {
 		return nil, errors.New("OTEL_EXPORTER_OTLP_PROTOCOL должен быть grpc или http/protobuf")
@@ -150,10 +155,10 @@ func getDuration(key, value string) (time.Duration, error) {
 	return duration, nil
 }
 
-func getInt(key, value string) (int, error) {
+func getInt(key, value string) (int32, error) {
 	number, err := strconv.ParseInt(value, 10, 32)
 	if err != nil {
 		return 0, fmt.Errorf("%s должен быть целым числом в диапазоне int32", key)
 	}
-	return int(number), nil
+	return int32(number), nil
 }

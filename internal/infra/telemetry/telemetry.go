@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"strconv"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -71,7 +72,7 @@ func traceSampler(name, arg string) (sdktrace.Sampler, error) {
 		return sdktrace.ParentBased(sdktrace.NeverSample()), nil
 	case "traceidratio", "parentbased_traceidratio":
 		ratio, err := strconv.ParseFloat(arg, 64)
-		if err != nil || ratio < 0 || ratio > 1 {
+		if err != nil || math.IsNaN(ratio) || math.IsInf(ratio, 0) || ratio < 0 || ratio > 1 {
 			return nil, errors.New("OTEL_TRACES_SAMPLER_ARG must be between 0 and 1")
 		}
 		sampler := sdktrace.TraceIDRatioBased(ratio)

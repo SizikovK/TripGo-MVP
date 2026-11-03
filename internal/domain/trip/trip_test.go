@@ -6,8 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SizikovK/TripGo-MVP/internal/domain/trip"
 	"github.com/google/uuid"
+
+	"github.com/SizikovK/TripGo-MVP/internal/domain/trip"
 )
 
 func TestValidate(t *testing.T) {
