@@ -41,4 +41,4 @@ docker-build:
 	docker build -t tripgo .
 
 docker-run: docker-build
-	docker run --rm --env-file .env -e HTTP_ADDR=:8080 -e DATABASE_URL="$$DOCKER_DATABASE_URL" -p 8001:8080 tripgo
+	docker run --rm --env-file .env -e HTTP_ADDR=:8080 -e DATABASE_URL="$$DOCKER_DATABASE_URL" -e OTEL_EXPORTER_OTLP_ENDPOINT="$$DOCKER_OTEL_EXPORTER_OTLP_ENDPOINT" -p 8001:8080 tripgo
