@@ -58,11 +58,11 @@ func exporters(ctx context.Context, cfg *config.Config) (sdktrace.SpanExporter, 
 		m, err := otlpmetricgrpc.New(ctx, otlpmetricgrpc.WithEndpointURL(cfg.OTelEndpoint))
 		return t, m, err
 	}
-	t, err := otlptracehttp.New(ctx, otlptracehttp.WithEndpointURL(cfg.OTelEndpoint))
+	t, err := otlptracehttp.New(ctx, otlptracehttp.WithEndpointURL(cfg.OTelEndpoint), otlptracehttp.WithURLPath("/v1/traces"))
 	if err != nil {
 		return nil, nil, err
 	}
-	m, err := otlpmetrichttp.New(ctx, otlpmetrichttp.WithEndpointURL(cfg.OTelEndpoint))
+	m, err := otlpmetrichttp.New(ctx, otlpmetrichttp.WithEndpointURL(cfg.OTelEndpoint), otlpmetrichttp.WithURLPath("/v1/metrics"))
 	return t, m, err
 }
 
