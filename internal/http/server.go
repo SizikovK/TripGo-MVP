@@ -37,6 +37,8 @@ type handlers struct {
 	timeout      time.Duration
 }
 
+var _ api.ServerInterface = (*handlers)(nil)
+
 func NewServer(cfg *config.Config, dependencies Dependencies) (*http.Server, error) {
 	router := chi.NewRouter()
 	api.HandlerWithOptions(&handlers{dependencies: dependencies, timeout: cfg.DatabaseQueryTimeout}, api.ChiServerOptions{
