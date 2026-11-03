@@ -5,8 +5,9 @@ package get
 import (
 	"context"
 
-	"github.com/SizikovK/TripGo-MVP/internal/model"
 	"github.com/google/uuid"
+
+	"github.com/SizikovK/TripGo-MVP/internal/model"
 )
 
 type tripRepository interface {

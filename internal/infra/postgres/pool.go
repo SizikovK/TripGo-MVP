@@ -16,8 +16,8 @@ func New(ctx context.Context, cfg *config.Config, traces trace.TracerProvider, m
 	if err != nil {
 		return nil, fmt.Errorf("parse database config: %w", err)
 	}
-	poolConfig.MaxConns = int32(cfg.DatabaseMaxConns)
-	poolConfig.MinConns = int32(cfg.DatabaseMinConns)
+	poolConfig.MaxConns = cfg.DatabaseMaxConns
+	poolConfig.MinConns = cfg.DatabaseMinConns
 	poolConfig.MaxConnLifetime = cfg.DatabaseMaxConnLifetime
 	poolConfig.ConnConfig.ConnectTimeout = cfg.DatabaseConnectTimeout
 	tracer, err := newQueryTracer(traces, meters)

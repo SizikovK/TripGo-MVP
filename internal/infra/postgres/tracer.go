@@ -52,7 +52,8 @@ func (t *queryTracer) TraceQueryEnd(ctx context.Context, conn *pgx.Conn, data pg
 			trace.SpanFromContext(ctx).SetAttributes(attribute.String("error.type", errorType))
 		}
 		t.duration.Record(ctx, time.Since(info.started).Seconds(), metric.WithAttributes(
-			attribute.String("db.operation.name", info.operation), attribute.String("db.collection.name", info.collection), attribute.String("error.type", errorType)))
+			attribute.String("db.operation.name", info.operation), attribute.String("db.collection.name", info.collection), attribute.String("error.type", errorType),
+		))
 	}
 	t.Tracer.TraceQueryEnd(ctx, conn, data)
 }
