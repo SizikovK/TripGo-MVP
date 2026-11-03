@@ -20,8 +20,6 @@ import (
 	"github.com/SizikovK/TripGo-MVP/internal/http/trip/get"
 )
 
-type pinger interface{ Ping(context.Context) error }
-
 type Dependencies struct {
 	Create    *create.Handler
 	Get       *get.Handler
@@ -57,8 +55,13 @@ func NewServer(cfg *config.Config, dependencies Dependencies) (*http.Server, err
 		return nil, err
 	}
 	return &http.Server{
-		Addr: cfg.HttpAddr, Handler: handler, ReadTimeout: cfg.ServerReadTimeout, ReadHeaderTimeout: cfg.ServerReadHeaderTimeout,
-		WriteTimeout: cfg.ServerWriteTimeout, IdleTimeout: cfg.ServerIdleTimeout,
+		Addr:              cfg.HttpAddr,
+		Handler:           handler,
+		ErrorLog:          slog.NewLogLogger(dependencies.Logger.Handler(), slog.LevelError),
+		ReadTimeout:       cfg.ServerReadTimeout,
+		ReadHeaderTimeout: cfg.ServerReadHeaderTimeout,
+		WriteTimeout:      cfg.ServerWriteTimeout,
+		IdleTimeout:       cfg.ServerIdleTimeout,
 	}, nil
 }
 

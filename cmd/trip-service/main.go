@@ -17,7 +17,8 @@ import (
 
 func main() {
 	if err := run(); err != nil {
-		slog.Error("service stopped with error", "error", err)
+		logger := slog.New(slog.NewJSONHandler(os.Stdout, nil)).With("service", "trip-service", "trace_id", "", "span_id", "")
+		logger.Error("service stopped with error", "error", err)
 		os.Exit(1)
 	}
 }
