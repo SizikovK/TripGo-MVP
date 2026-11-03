@@ -26,6 +26,8 @@ type Handler struct {
 	trips        *trips.Service
 }
 
+var _ api.ServerInterface = (*Handler)(nil)
+
 func NewHTTPHandler(config *config.Config, dbPool *pgxpool.Pool, service *trips.Service) *Handler {
 	return &Handler{
 		dbPool:       dbPool,
