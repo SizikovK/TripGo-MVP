@@ -26,16 +26,22 @@ type Providers struct {
 }
 
 func New(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*Providers, error) {
-	traceExporter, meterExporter, err := exporters(ctx, cfg)
-	if err != nil {
-		return nil, fmt.Errorf("create OTLP exporters: %w", err)
-	}
 	sampler, err := traceSampler(cfg.OTelSampler, cfg.OTelSamplerArg)
 	if err != nil {
 		return nil, err
 	}
-	res := resource.NewSchemaless(attribute.String("service.name", cfg.ServiceName), attribute.String("service.version", cfg.ServiceVersion),
-		attribute.String("service.namespace", "tripgo"), attribute.String("deployment.environment", "local"))
+	res, err := resource.New(ctx,
+		resource.WithAttributes(attribute.String("service.namespace", "tripgo"), attribute.String("deployment.environment", "local")),
+		resource.WithFromEnv(),
+		resource.WithAttributes(attribute.String("service.name", cfg.ServiceName), attribute.String("service.version", cfg.ServiceVersion)),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("telemetry resource: %w", err)
+	}
+	traceExporter, meterExporter, err := exporters(ctx, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("create OTLP exporters: %w", err)
+	}
 	traces := sdktrace.NewTracerProvider(sdktrace.WithResource(res), sdktrace.WithSampler(sampler), sdktrace.WithBatcher(traceExporter, sdktrace.WithExportTimeout(cfg.DatabaseQueryTimeout)))
 	meters := sdkmetric.NewMeterProvider(sdkmetric.WithResource(res), sdkmetric.WithReader(sdkmetric.NewPeriodicReader(meterExporter,
 		sdkmetric.WithInterval(cfg.OTelMetricInterval), sdkmetric.WithTimeout(cfg.DatabaseQueryTimeout))))

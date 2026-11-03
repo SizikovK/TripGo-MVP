@@ -126,7 +126,6 @@ func fromEnv(getenv func(string) string) (*Config, error) {
 	return cfg, nil
 }
 
-// Проверка адресов и обязательных параметров не зависит от чтения env.
 func (cfg *Config) validateAddress() error {
 	if strings.TrimSpace(cfg.DatabaseUrl) == "" {
 		return errors.New("DATABASE_URL обязателен")

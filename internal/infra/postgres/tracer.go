@@ -23,21 +23,22 @@ type queryInfo struct {
 }
 
 type queryTracer struct {
-	*otelpgx.Tracer
+	base     *otelpgx.Tracer
 	duration metric.Float64Histogram
 }
 
 func newQueryTracer(traces trace.TracerProvider, meters metric.MeterProvider) (*queryTracer, error) {
-	duration, err := meters.Meter("tripgo.postgres").Float64Histogram("db.client.operation.duration", metric.WithUnit("s"))
+	duration, err := meters.Meter("tripgo.postgres").Float64Histogram("db.client.operation.duration", metric.WithUnit("s"),
+		metric.WithExplicitBucketBoundaries(.001, .0025, .005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10))
 	if err != nil {
 		return nil, err
 	}
 	base := otelpgx.NewTracer(otelpgx.WithTracerProvider(traces), otelpgx.WithMeterProvider(noop.NewMeterProvider()), otelpgx.WithDisableAcquireTracer())
-	return &queryTracer{Tracer: base, duration: duration}, nil
+	return &queryTracer{base: base, duration: duration}, nil
 }
 
 func (t *queryTracer) TraceQueryStart(ctx context.Context, conn *pgx.Conn, data pgx.TraceQueryStartData) context.Context {
-	ctx = t.Tracer.TraceQueryStart(ctx, conn, data)
+	ctx = t.base.TraceQueryStart(ctx, conn, data)
 	info := queryInfo{started: time.Now(), operation: otelpgx.SQLOperationName(ctx, data.SQL), collection: collectionName(data.SQL)}
 	trace.SpanFromContext(ctx).SetAttributes(attribute.String("db.collection.name", info.collection))
 	return context.WithValue(ctx, queryKey{}, info)
@@ -55,7 +56,7 @@ func (t *queryTracer) TraceQueryEnd(ctx context.Context, conn *pgx.Conn, data pg
 			attribute.String("db.operation.name", info.operation), attribute.String("db.collection.name", info.collection), attribute.String("error.type", errorType),
 		))
 	}
-	t.Tracer.TraceQueryEnd(ctx, conn, data)
+	t.base.TraceQueryEnd(ctx, conn, data)
 }
 
 func collectionName(query string) string {
