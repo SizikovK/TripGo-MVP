@@ -9,7 +9,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	domain "github.com/SizikovK/TripGo-MVP/internal/domain/trip"
 	"github.com/SizikovK/TripGo-MVP/internal/infra/postgres/transaction"
@@ -19,11 +18,11 @@ import (
 const columns = "id, user_id, driver_id, start_latitude, start_longitude, end_latitude, end_longitude, price, status, started_at, finished_at"
 
 type Repository struct {
-	pool    *pgxpool.Pool
+	pool    database
 	builder sq.StatementBuilderType
 }
 
-func New(pool *pgxpool.Pool) *Repository {
+func New(pool database) *Repository {
 	return &Repository{pool: pool, builder: sq.StatementBuilder.PlaceholderFormat(sq.Dollar)}
 }
 

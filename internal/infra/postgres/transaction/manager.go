@@ -8,7 +8,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type txKey struct{}
@@ -19,11 +18,11 @@ type executor interface {
 }
 
 type Manager struct {
-	pool            *pgxpool.Pool
+	pool            database
 	rollbackTimeout time.Duration
 }
 
-func New(pool *pgxpool.Pool, rollbackTimeout time.Duration) *Manager {
+func New(pool database, rollbackTimeout time.Duration) *Manager {
 	return &Manager{pool: pool, rollbackTimeout: rollbackTimeout}
 }
 
@@ -55,7 +54,7 @@ func (m *Manager) Do(ctx context.Context, fn func(context.Context) error) (err e
 	return nil
 }
 
-func Connection(ctx context.Context, pool *pgxpool.Pool) executor {
+func Connection(ctx context.Context, pool executor) executor {
 	if tx, ok := ctx.Value(txKey{}).(pgx.Tx); ok {
 		return tx
 	}
