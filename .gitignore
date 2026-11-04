@@ -1,3 +1,5 @@
+.vscode
+
 # Локальные файлы окружения: создаются tripgoctl, у каждого свои
 .env
 .tripgo/
@@ -6,3 +8,4 @@
 bin/
 
 .DS_Store
+coverage.out
