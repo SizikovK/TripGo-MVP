@@ -44,6 +44,7 @@ func run() error {
 		}
 	}()
 	app.Logger.InfoContext(ctx, "service started", "addr", app.Server.Addr)
+	app.Start(context.WithoutCancel(ctx))
 	serverErrors := make(chan error, 1)
 	go func() { serverErrors <- app.Server.ListenAndServe() }()
 	select {

@@ -25,8 +25,8 @@ func (e *StatusError) Error() string {
 }
 
 type Gateway struct {
-	client     *pushapi.Client
-	httpClient *http.Client
+	client    *pushapi.Client
+	transport *http.Transport
 }
 
 func New(endpoint string, timeout time.Duration, traces trace.TracerProvider) (*Gateway, error) {
@@ -44,7 +44,7 @@ func New(endpoint string, timeout time.Duration, traces trace.TracerProvider) (*
 		return nil, fmt.Errorf("create push client: %w", err)
 	}
 
-	return &Gateway{client: api, httpClient: client}, nil
+	return &Gateway{client: api, transport: transport}, nil
 }
 
 func (g *Gateway) RequestPosition(ctx context.Context, request model.PositionRequest) error {
@@ -69,5 +69,5 @@ func (g *Gateway) RequestPosition(ctx context.Context, request model.PositionReq
 }
 
 func (g *Gateway) Close() {
-	g.httpClient.CloseIdleConnections()
+	g.transport.CloseIdleConnections()
 }

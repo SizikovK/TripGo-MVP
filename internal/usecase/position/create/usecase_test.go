@@ -17,7 +17,9 @@ import (
 )
 
 func TestExecute(t *testing.T) {
-	for _, name := range []string{"success", "repository error", "commit error", "future time"} {
+	const future = "future time"
+	const success = "success"
+	for _, name := range []string{success, "repository error", "commit error", future} {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			repository := NewMockrepository(ctrl)
@@ -33,7 +35,7 @@ func TestExecute(t *testing.T) {
 			failure := errors.New("database failure")
 			clock.EXPECT().Now().Return(now)
 
-			if name == "future time" {
+			if name == future {
 				data.RecordedAt = now.Add(2 * time.Minute)
 			} else {
 				var repositoryError error
@@ -53,19 +55,20 @@ func TestExecute(t *testing.T) {
 				})
 			}
 
-			if name == "success" {
+			if name == success {
 				queue.EXPECT().Cancel(id)
 				metrics.EXPECT().Saved(ctx)
 			}
 
 			usecase := create.New(repository, transactions, queue, clock, metrics, slog.New(slog.NewTextHandler(io.Discard, nil)))
 			actual, err := usecase.Execute(ctx, id, data)
-			if name == "success" {
+			switch name {
+			case success:
 				require.NoError(t, err)
 				require.Equal(t, expected, actual)
-			} else if name == "future time" {
+			case future:
 				require.Error(t, err)
-			} else {
+			default:
 				require.ErrorIs(t, err, failure)
 			}
 		})
