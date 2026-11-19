@@ -31,13 +31,16 @@ func (r *Repository) Get(ctx context.Context, id uuid.UUID) (model.Trip, error) 
 	if err != nil {
 		return model.Trip{}, fmt.Errorf("build get trip: %w", err)
 	}
+
 	record, err := scanTrip(transaction.Connection(ctx, r.pool).QueryRow(ctx, query, args...))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return model.Trip{}, domain.ErrTripNotFound
 	}
+
 	if err != nil {
 		return model.Trip{}, fmt.Errorf("get trip: %w", err)
 	}
+
 	return record, nil
 }
 
@@ -49,14 +52,17 @@ func (r *Repository) Create(ctx context.Context, record model.Trip) error {
 	if err != nil {
 		return fmt.Errorf("build create trip: %w", err)
 	}
+
 	_, err = transaction.Connection(ctx, r.pool).Exec(ctx, query, args...)
 	var pgError *pgconn.PgError
 	if errors.As(err, &pgError) && pgError.Code == "23505" && pgError.ConstraintName == "trips_one_active_per_driver_idx" {
 		return domain.ErrDriverBusy
 	}
+
 	if err != nil {
 		return fmt.Errorf("insert trip: %w", err)
 	}
+
 	return nil
 }
 
@@ -66,16 +72,20 @@ func (r *Repository) Finish(ctx context.Context, record model.Trip) error {
 	if err != nil {
 		return fmt.Errorf("build finish trip: %w", err)
 	}
+
 	tag, err := transaction.Connection(ctx, r.pool).Exec(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("update trip: %w", err)
 	}
+
 	if tag.RowsAffected() == 0 {
 		if _, err := r.Get(ctx, record.ID); err != nil {
 			return err
 		}
+
 		return domain.ErrTripCompleted
 	}
+
 	return nil
 }
 
@@ -84,9 +94,11 @@ func (r *Repository) AddHistory(ctx context.Context, id uuid.UUID, from *string,
 	if err != nil {
 		return fmt.Errorf("build history: %w", err)
 	}
+
 	if _, err := transaction.Connection(ctx, r.pool).Exec(ctx, query, args...); err != nil {
 		return fmt.Errorf("insert history: %w", err)
 	}
+
 	return nil
 }
 
@@ -95,9 +107,11 @@ func (r *Repository) CountActive(ctx context.Context) (int64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("build count: %w", err)
 	}
+
 	var count int64
 	if err := r.pool.QueryRow(ctx, query, args...).Scan(&count); err != nil {
 		return 0, fmt.Errorf("count active trips: %w", err)
 	}
+
 	return count, nil
 }

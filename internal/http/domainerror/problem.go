@@ -22,5 +22,6 @@ func Problem(err error) (int, api.Problem) {
 	case errors.Is(err, trip.ErrDriverBusy):
 		status, code, title, detail = http.StatusConflict, "driver_busy", "Driver busy", "Driver already has an active trip"
 	}
+
 	return status, api.Problem{Type: "https://tripgo.example/problems/" + strings.ReplaceAll(code, "_", "-"), Title: title, Status: int32(status), Code: code, Detail: &detail}
 }

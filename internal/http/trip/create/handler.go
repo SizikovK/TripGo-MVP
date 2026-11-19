@@ -26,6 +26,7 @@ func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 		response.Error(w, r, h.logger, err)
 		return
 	}
+
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
 	record, err := h.usecase.Execute(ctx, data)
@@ -33,6 +34,7 @@ func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 		response.Error(w, r, h.logger, err)
 		return
 	}
+
 	w.Header().Set("Location", "/api/v1/trips/"+record.ID.String())
 	response.JSON(w, r, h.logger, http.StatusCreated, trip.Response(record))
 }

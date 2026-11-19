@@ -30,5 +30,6 @@ func (h *Handler) Handle(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
 		response.Error(w, r, h.logger, err)
 		return
 	}
+
 	response.JSON(w, r, h.logger, http.StatusOK, trip.Response(record))
 }

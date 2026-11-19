@@ -15,7 +15,9 @@ func Logger(level, service string) (*slog.Logger, error) {
 	if err := parsed.UnmarshalText([]byte(level)); err != nil {
 		return nil, err
 	}
+
 	base := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: parsed})
+
 	return slog.New(logHandler{handler: base}).With("service", service), nil
 }
 
@@ -30,7 +32,9 @@ func (h logHandler) Handle(ctx context.Context, record slog.Record) error {
 		traceID = span.TraceID().String()
 		spanID = span.SpanID().String()
 	}
+
 	record.AddAttrs(slog.String("trace_id", traceID), slog.String("span_id", spanID))
+
 	return h.handler.Handle(ctx, record)
 }
 

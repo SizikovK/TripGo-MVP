@@ -16,6 +16,7 @@ func New(ctx context.Context, cfg *config.Config, traces trace.TracerProvider, m
 	if err != nil {
 		return nil, fmt.Errorf("parse database config: %w", err)
 	}
+
 	poolConfig.MaxConns = cfg.DatabaseMaxConns
 	poolConfig.MinConns = cfg.DatabaseMinConns
 	poolConfig.MaxConnLifetime = cfg.DatabaseMaxConnLifetime
@@ -24,16 +25,19 @@ func New(ctx context.Context, cfg *config.Config, traces trace.TracerProvider, m
 	if err != nil {
 		return nil, err
 	}
+
 	poolConfig.ConnConfig.Tracer = tracer
 	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {
 		return nil, fmt.Errorf("create pool: %w", err)
 	}
+
 	pingCtx, cancel := context.WithTimeout(ctx, cfg.DatabaseConnectTimeout)
 	defer cancel()
 	if err := pool.Ping(pingCtx); err != nil {
 		pool.Close()
 		return nil, fmt.Errorf("ping database: %w", err)
 	}
+
 	return pool, nil
 }

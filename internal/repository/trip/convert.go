@@ -12,5 +12,6 @@ func scanTrip(row pgx.Row) (model.Trip, error) {
 		&record.StartPoint.Latitude, &record.StartPoint.Longitude,
 		&record.EndPoint.Latitude, &record.EndPoint.Longitude,
 		&record.Price, &record.Status, &record.StartedAt, &record.FinishedAt)
+
 	return record, err
 }

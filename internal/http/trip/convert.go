@@ -20,36 +20,44 @@ func Decode(w http.ResponseWriter, r *http.Request) (model.CreateTrip, error) {
 	if err != nil || mediaType != "application/json" {
 		return model.CreateTrip{}, &domain.ValidationError{Field: "Content-Type", Detail: "must be application/json"}
 	}
+
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		return model.CreateTrip{}, &domain.ValidationError{Field: bodyField, Detail: "cannot read body or size exceeds 1 MiB"}
 	}
+
 	decoder := json.NewDecoder(bytes.NewReader(body))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&input); err != nil {
 		return model.CreateTrip{}, &domain.ValidationError{Field: bodyField, Detail: "invalid JSON or unknown fields"}
 	}
+
 	if err := decoder.Decode(new(any)); err != io.EOF {
 		return model.CreateTrip{}, &domain.ValidationError{Field: bodyField, Detail: "expected one JSON object"}
 	}
+
 	fields, err := requiredFields(body, "", "user_id", "driver_id", "start_point", "end_point", "price")
 	if err != nil {
 		return model.CreateTrip{}, err
 	}
+
 	for _, name := range []string{"start_point", "end_point"} {
 		if _, err := requiredFields(fields[name], name+".", "latitude", "longitude"); err != nil {
 			return model.CreateTrip{}, err
 		}
 	}
+
 	data := model.CreateTrip{
 		UserID: input.UserId, DriverID: input.DriverId, Price: input.Price,
 		StartPoint: model.Coordinates{Latitude: input.StartPoint.Latitude, Longitude: input.StartPoint.Longitude},
 		EndPoint:   model.Coordinates{Latitude: input.EndPoint.Latitude, Longitude: input.EndPoint.Longitude},
 	}
+
 	if err := data.Validate(); err != nil {
 		return model.CreateTrip{}, err
 	}
+
 	return data, nil
 }
 
@@ -58,12 +66,14 @@ func requiredFields(body []byte, prefix string, names ...string) (map[string]jso
 	if err := json.Unmarshal(body, &fields); err != nil {
 		return nil, &domain.ValidationError{Field: bodyField, Detail: "expected an object"}
 	}
+
 	for _, name := range names {
 		value, ok := fields[name]
 		if !ok || bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
 			return nil, &domain.ValidationError{Field: prefix + name, Detail: "required"}
 		}
 	}
+
 	return fields, nil
 }
 

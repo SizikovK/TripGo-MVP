@@ -30,12 +30,14 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("configuration: %w", err)
 	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	app, err := container.New(ctx, cfg)
 	if err != nil {
 		return fmt.Errorf("initialize service: %w", err)
 	}
+
 	defer func() {
 		if err := app.Close(ctx); err != nil {
 			app.Logger.WarnContext(ctx, "cleanup failed", "error", err)
@@ -49,6 +51,7 @@ func run() error {
 		if !errors.Is(err, http.ErrServerClosed) {
 			return fmt.Errorf("HTTP server: %w", err)
 		}
+
 		return nil
 	case <-ctx.Done():
 		app.Logger.InfoContext(ctx, "service stopping")
@@ -68,6 +71,7 @@ func run() error {
 		if err := app.Server.Shutdown(shutdownCtx); err != nil {
 			return fmt.Errorf("shutdown HTTP: %w", err)
 		}
+
 		app.Logger.InfoContext(shutdownCtx, "HTTP server stopped")
 		return nil
 	}

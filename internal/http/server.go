@@ -50,12 +50,15 @@ func NewServer(cfg *config.Config, dependencies Dependencies) (*http.Server, err
 		if !router.Match(ctx, r.Method, r.URL.Path) {
 			return "unmatched"
 		}
+
 		return ctx.RoutePattern()
 	}
+
 	handler, err := middleware.Wrap(router, dependencies.Logger, dependencies.Traces, dependencies.Meters, resolveRoute)
 	if err != nil {
 		return nil, err
 	}
+
 	return &http.Server{
 		Addr:              cfg.HttpAddr,
 		Handler:           handler,
@@ -91,5 +94,6 @@ func (h *handlers) Ready(w http.ResponseWriter, r *http.Request) {
 		status, result = http.StatusServiceUnavailable, api.Unavailable
 		h.dependencies.Logger.WarnContext(ctx, "database unavailable", "error", err)
 	}
+
 	response.JSON(w, r, h.dependencies.Logger, status, api.HealthResponse{Status: result})
 }

@@ -37,16 +37,19 @@ func New(ctx context.Context, cfg *config.Config) (*Container, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	providers, err := telemetry.New(ctx, cfg, logger)
 	if err != nil {
 		return nil, err
 	}
+
 	app := &Container{Logger: logger, telemetry: providers, shutdownTimeout: cfg.ShutdownTimeout}
 	pool, err := postgres.New(ctx, cfg, providers.Traces, providers.Meters)
 	if err != nil {
 		_ = app.Close(ctx)
 		return nil, err
 	}
+
 	app.pool = pool
 	repository := trip.New(pool)
 	transactions := transaction.New(pool, cfg.DatabaseQueryTimeout)
@@ -55,6 +58,7 @@ func New(ctx context.Context, cfg *config.Config) (*Container, error) {
 		_ = app.Close(ctx)
 		return nil, err
 	}
+
 	createTrip := create.New(repository, transactions, logger, metrics)
 	getTrip := get.New(repository)
 	finishTrip := finish.New(repository, transactions, logger, metrics)
@@ -68,7 +72,9 @@ func New(ctx context.Context, cfg *config.Config) (*Container, error) {
 		_ = app.Close(ctx)
 		return nil, err
 	}
+
 	app.Server = server
+
 	return app, nil
 }
 
@@ -79,12 +85,15 @@ func (c *Container) Close(ctx context.Context) error {
 	if c.Server != nil {
 		err = c.Server.Close()
 	}
+
 	err = errors.Join(err, c.telemetry.Shutdown(cleanup))
 	if c.pool != nil {
 		c.pool.Close()
 	}
+
 	if err != nil {
 		return fmt.Errorf("close dependencies: %w", err)
 	}
+
 	return nil
 }

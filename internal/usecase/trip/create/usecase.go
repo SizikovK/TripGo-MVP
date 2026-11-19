@@ -27,17 +27,21 @@ func (u *Usecase) Execute(ctx context.Context, data model.CreateTrip) (model.Tri
 	if err := data.Validate(); err != nil {
 		return model.Trip{}, err
 	}
+
 	record := model.Trip{Data: data, ID: uuid.New(), Status: trip.StatusActive, StartedAt: time.Now().UTC()}
 	err := u.transactions.Do(ctx, func(ctx context.Context) error {
 		if err := u.repository.Create(ctx, record); err != nil {
 			return err
 		}
+
 		return u.repository.AddHistory(ctx, record.ID, nil, string(trip.StatusActive))
 	})
 	if err != nil {
 		return model.Trip{}, fmt.Errorf("create trip: %w", err)
 	}
+
 	u.metrics.Created(ctx)
 	u.logger.InfoContext(ctx, "trip created", "trip_id", record.ID)
+
 	return record, nil
 }
