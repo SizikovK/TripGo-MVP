@@ -16,25 +16,9 @@ const bodyField = "body"
 
 func Decode(w http.ResponseWriter, r *http.Request) (model.CreateTrip, error) {
 	var input api.CreateTripJSONRequestBody
-	mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
-	if err != nil || mediaType != "application/json" {
-		return model.CreateTrip{}, &domain.ValidationError{Field: "Content-Type", Detail: "must be application/json"}
-	}
-
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
-	body, err := io.ReadAll(r.Body)
+	body, err := decodeJSON(w, r, &input)
 	if err != nil {
-		return model.CreateTrip{}, &domain.ValidationError{Field: bodyField, Detail: "cannot read body or size exceeds 1 MiB"}
-	}
-
-	decoder := json.NewDecoder(bytes.NewReader(body))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&input); err != nil {
-		return model.CreateTrip{}, &domain.ValidationError{Field: bodyField, Detail: "invalid JSON or unknown fields"}
-	}
-
-	if err := decoder.Decode(new(any)); err != io.EOF {
-		return model.CreateTrip{}, &domain.ValidationError{Field: bodyField, Detail: "expected one JSON object"}
+		return model.CreateTrip{}, err
 	}
 
 	fields, err := requiredFields(body, "", "user_id", "driver_id", "start_point", "end_point", "price")
@@ -82,7 +66,32 @@ func Response(record model.Trip) api.Trip {
 		Id: record.ID, UserId: record.UserID, DriverId: record.DriverID, Price: record.Price,
 		Status: api.TripStatus(record.Status), StartedAt: record.StartedAt, FinishedAt: record.FinishedAt,
 		LastPositionAt: record.LastPositionAt,
-		StartPoint: api.Coordinates{Latitude: record.StartPoint.Latitude, Longitude: record.StartPoint.Longitude},
-		EndPoint:   api.Coordinates{Latitude: record.EndPoint.Latitude, Longitude: record.EndPoint.Longitude},
+		StartPoint:     api.Coordinates{Latitude: record.StartPoint.Latitude, Longitude: record.StartPoint.Longitude},
+		EndPoint:       api.Coordinates{Latitude: record.EndPoint.Latitude, Longitude: record.EndPoint.Longitude},
 	}
+}
+
+func decodeJSON(w http.ResponseWriter, r *http.Request, input any) ([]byte, error) {
+	mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	if err != nil || mediaType != "application/json" {
+		return nil, &domain.ValidationError{Field: "Content-Type", Detail: "must be application/json"}
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		return nil, &domain.ValidationError{Field: bodyField, Detail: "cannot read body or size exceeds 1 MiB"}
+	}
+
+	decoder := json.NewDecoder(bytes.NewReader(body))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(input); err != nil {
+		return nil, &domain.ValidationError{Field: bodyField, Detail: "invalid JSON or unknown fields"}
+	}
+
+	if err := decoder.Decode(new(any)); err != io.EOF {
+		return nil, &domain.ValidationError{Field: bodyField, Detail: "expected one JSON object"}
+	}
+
+	return body, nil
 }

@@ -14,6 +14,8 @@ import (
 	"github.com/SizikovK/TripGo-MVP/internal/domain/trip"
 	api "github.com/SizikovK/TripGo-MVP/internal/generated"
 	"github.com/SizikovK/TripGo-MVP/internal/http/middleware"
+	positioncreate "github.com/SizikovK/TripGo-MVP/internal/http/position/create"
+	positionlist "github.com/SizikovK/TripGo-MVP/internal/http/position/list"
 	"github.com/SizikovK/TripGo-MVP/internal/http/response"
 	"github.com/SizikovK/TripGo-MVP/internal/http/trip/create"
 	"github.com/SizikovK/TripGo-MVP/internal/http/trip/finish"
@@ -21,13 +23,15 @@ import (
 )
 
 type Dependencies struct {
-	Create    *create.Handler
-	Get       *get.Handler
-	Finish    *finish.Handler
-	Readiness pinger
-	Logger    *slog.Logger
-	Traces    trace.TracerProvider
-	Meters    metric.MeterProvider
+	CreatePosition *positioncreate.Handler
+	ListPositions  *positionlist.Handler
+	Create         *create.Handler
+	Get            *get.Handler
+	Finish         *finish.Handler
+	Readiness      pinger
+	Logger         *slog.Logger
+	Traces         trace.TracerProvider
+	Meters         metric.MeterProvider
 }
 
 type handlers struct {
@@ -36,6 +40,14 @@ type handlers struct {
 }
 
 var _ api.ServerInterface = (*handlers)(nil)
+
+func (h *handlers) CreateTripPosition(w http.ResponseWriter, r *http.Request, id api.TripId) {
+	h.dependencies.CreatePosition.Handle(w, r, id)
+}
+
+func (h *handlers) ListTripPositions(w http.ResponseWriter, r *http.Request, id api.TripId) {
+	h.dependencies.ListPositions.Handle(w, r, id)
+}
 
 func NewServer(cfg *config.Config, dependencies Dependencies) (*http.Server, error) {
 	router := chi.NewRouter()
