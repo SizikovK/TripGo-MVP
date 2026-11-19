@@ -14,6 +14,12 @@ import (
 )
 
 type Config struct {
+	PositionCheckInterval   time.Duration
+	PositionStaleAfter      time.Duration
+	PositionWorkers         int32
+	PositionQueueSize       int32
+	PushHTTPURL             string
+	PushRequestTimeout      time.Duration
 	ServiceName             string
 	ServiceVersion          string
 	OTelEndpoint            string
@@ -143,7 +149,47 @@ func fromEnv(getenv func(string) string) (*Config, error) {
 		return nil, errors.New("пул БД: требуется 0 <= DATABASE_MIN_CONNS <= DATABASE_MAX_CONNS и DATABASE_MAX_CONNS > 0")
 	}
 
+	if err := cfg.loadPositions(value); err != nil {
+		return nil, err
+	}
+
 	return cfg, nil
+}
+
+func (cfg *Config) loadPositions(value func(string, string) string) error {
+	var err error
+	cfg.PositionCheckInterval, err = getDuration("POSITION_CHECK_INTERVAL", value("POSITION_CHECK_INTERVAL", "30s"))
+	if err != nil {
+		return err
+	}
+
+	cfg.PositionStaleAfter, err = getDuration("POSITION_STALE_AFTER", value("POSITION_STALE_AFTER", "60s"))
+	if err != nil {
+		return err
+	}
+
+	cfg.PushRequestTimeout, err = getDuration("PUSH_REQUEST_TIMEOUT", value("PUSH_REQUEST_TIMEOUT", "1s"))
+	if err != nil {
+		return err
+	}
+
+	cfg.PositionWorkers, err = getInt("POSITION_WORKERS", value("POSITION_WORKERS", "4"))
+	if err != nil || cfg.PositionWorkers <= 0 {
+		return errors.New("POSITION_WORKERS должен быть положительным целым числом")
+	}
+
+	cfg.PositionQueueSize, err = getInt("POSITION_QUEUE_SIZE", value("POSITION_QUEUE_SIZE", "100"))
+	if err != nil || cfg.PositionQueueSize <= 0 {
+		return errors.New("POSITION_QUEUE_SIZE должен быть положительным целым числом")
+	}
+
+	cfg.PushHTTPURL = value("PUSH_HTTP_URL", "")
+	endpoint, err := url.Parse(cfg.PushHTTPURL)
+	if err != nil || endpoint.Host == "" || (endpoint.Scheme != "http" && endpoint.Scheme != "https") {
+		return errors.New("PUSH_HTTP_URL обязателен и должен быть HTTP или HTTPS URL")
+	}
+
+	return nil
 }
 
 func (cfg *Config) validateAddress() error {

@@ -22,9 +22,16 @@ func TestFromEnv(t *testing.T) {
 		{name: "overflow", key: "DATABASE_MAX_CONNS", value: "2147483648", invalid: true},
 		{name: "bad port", key: "HTTP_ADDR", value: ":99999", invalid: true},
 		{name: "bad level", key: "LOG_LEVEL", value: "verbose", invalid: true},
+		{name: "missing push", key: "PUSH_HTTP_URL", invalid: true},
+		{name: "bad push", key: "PUSH_HTTP_URL", value: "invalid", invalid: true},
+		{name: "zero workers", key: "POSITION_WORKERS", value: "0", invalid: true},
+		{name: "negative queue", key: "POSITION_QUEUE_SIZE", value: "-1", invalid: true},
+		{name: "bad check interval", key: "POSITION_CHECK_INTERVAL", value: "0s", invalid: true},
+		{name: "bad stale interval", key: "POSITION_STALE_AFTER", value: "invalid", invalid: true},
+		{name: "bad push timeout", key: "PUSH_REQUEST_TIMEOUT", value: "-1s", invalid: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			env := map[string]string{"DATABASE_URL": "postgres://localhost/tripgo", collectorEndpoint: "http://localhost:4317"}
+			env := map[string]string{"DATABASE_URL": "postgres://localhost/tripgo", collectorEndpoint: "http://localhost:4317", "PUSH_HTTP_URL": "http://localhost:8090"}
 			if tc.key != "" {
 				env[tc.key] = tc.value
 			}
