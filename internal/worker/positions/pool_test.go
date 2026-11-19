@@ -302,3 +302,32 @@ func TestShutdownDeadlineCancelsPush(t *testing.T) {
 	require.ErrorIs(t, f.pool.Shutdown(ctx), context.Canceled)
 	require.Equal(t, "error", take(t, f.ctx, f.processed))
 }
+
+func TestScannerContinuesAfterRepositoryError(t *testing.T) {
+	f := newFixture(t, 1, 1)
+	failed := make(chan struct{})
+	f.repository.EXPECT().StaleTrips(gomock.Any(), time.Minute).DoAndReturn(func(context.Context, time.Duration) ([]model.PositionRequest, error) {
+		close(failed)
+		return nil, errors.New("database unavailable")
+	})
+	f.ticks <- time.Now()
+	take(t, f.ctx, failed)
+
+	next := request()
+	f.push.EXPECT().RequestPosition(gomock.Any(), next).Return(nil)
+	f.scan(next)
+	require.Equal(t, "success", take(t, f.ctx, f.processed))
+}
+
+func TestPushHasDeadline(t *testing.T) {
+	f := newFixture(t, 1, 1)
+	deadlines := make(chan bool, 1)
+	f.push.EXPECT().RequestPosition(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, _ model.PositionRequest) error {
+		deadline, ok := ctx.Deadline()
+		deadlines <- ok && time.Until(deadline) <= 5*time.Second
+		return nil
+	})
+	f.scan(request())
+	require.True(t, take(t, f.ctx, deadlines))
+	require.Equal(t, "success", take(t, f.ctx, f.processed))
+}

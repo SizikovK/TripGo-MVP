@@ -76,3 +76,20 @@ func TestTransportError(t *testing.T) {
 	var failure *push.StatusError
 	require.NotErrorAs(t, err, &failure)
 }
+
+func TestRequestTimeout(t *testing.T) {
+	release := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { <-release }))
+	defer server.Close()
+	defer close(release)
+
+	gateway, err := push.New(server.URL, 20*time.Millisecond, noop.NewTracerProvider())
+	require.NoError(t, err)
+	defer gateway.Close()
+
+	err = gateway.RequestPosition(context.Background(), model.PositionRequest{TripID: uuid.New(), DriverID: uuid.New()})
+	require.Error(t, err)
+	var timeout interface{ Timeout() bool }
+	require.ErrorAs(t, err, &timeout)
+	require.True(t, timeout.Timeout())
+}
