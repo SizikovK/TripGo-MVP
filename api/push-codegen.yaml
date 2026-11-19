@@ -1,0 +1,8 @@
+package: pushapi
+output: internal/generated/push/api.gen.go
+generate:
+  models: true
+  client: true
+output-options:
+  include-operation-ids:
+    - sendPush
