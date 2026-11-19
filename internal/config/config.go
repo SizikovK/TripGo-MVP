@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -13,12 +14,19 @@ import (
 )
 
 type Config struct {
+	ServiceName             string
+	ServiceVersion          string
+	OTelEndpoint            string
+	OTelProtocol            string
+	OTelSampler             string
+	OTelSamplerArg          string
+	OTelMetricInterval      time.Duration
 	HttpAddr                string
 	LogLevel                string
 	ShutdownTimeout         time.Duration
 	DatabaseUrl             string
-	DatabaseMaxConns        int
-	DatabaseMinConns        int
+	DatabaseMaxConns        int32
+	DatabaseMinConns        int32
 	DatabaseConnectTimeout  time.Duration
 	DatabaseQueryTimeout    time.Duration
 	DatabaseMaxConnLifetime time.Duration
@@ -43,14 +51,35 @@ func fromEnv(getenv func(string) string) (*Config, error) {
 		return fallback
 	}
 	cfg := &Config{
-		HttpAddr:    value("HTTP_ADDR", ":8080"),
-		LogLevel:    strings.ToLower(value("LOG_LEVEL", "info")),
-		DatabaseUrl: getenv("DATABASE_URL"),
+		ServiceName:    value("OTEL_SERVICE_NAME", "trip-service"),
+		ServiceVersion: value("SERVICE_VERSION", "local"),
+		OTelEndpoint:   getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
+		OTelProtocol:   value("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc"),
+		OTelSampler:    value("OTEL_TRACES_SAMPLER", "parentbased_always_on"),
+		OTelSamplerArg: value("OTEL_TRACES_SAMPLER_ARG", "1"),
+		HttpAddr:       value("HTTP_ADDR", ":8080"),
+		LogLevel:       strings.ToLower(value("LOG_LEVEL", "info")),
+		DatabaseUrl:    getenv("DATABASE_URL"),
 	}
 	if err := cfg.validateAddress(); err != nil {
 		return nil, err
 	}
 	var err error
+	interval, err := getInt("OTEL_METRIC_EXPORT_INTERVAL", value("OTEL_METRIC_EXPORT_INTERVAL", "5000"))
+	if err != nil || interval <= 0 {
+		return nil, errors.New("OTEL_METRIC_EXPORT_INTERVAL должен быть положительным числом миллисекунд")
+	}
+	cfg.OTelMetricInterval = time.Duration(interval) * time.Millisecond
+	if cfg.OTelEndpoint == "" {
+		return nil, errors.New("OTEL_EXPORTER_OTLP_ENDPOINT обязателен")
+	}
+	endpoint, err := url.Parse(cfg.OTelEndpoint)
+	if err != nil || endpoint.Host == "" || (endpoint.Scheme != "http" && endpoint.Scheme != "https") {
+		return nil, errors.New("OTEL_EXPORTER_OTLP_ENDPOINT должен быть HTTP или HTTPS URL")
+	}
+	if cfg.OTelProtocol != "grpc" && cfg.OTelProtocol != "http/protobuf" {
+		return nil, errors.New("OTEL_EXPORTER_OTLP_PROTOCOL должен быть grpc или http/protobuf")
+	}
 	cfg.ShutdownTimeout, err = getDuration("SHUTDOWN_TIMEOUT", value("SHUTDOWN_TIMEOUT", "30s"))
 	if err != nil {
 		return nil, err
@@ -97,7 +126,6 @@ func fromEnv(getenv func(string) string) (*Config, error) {
 	return cfg, nil
 }
 
-// Проверка адресов и обязательных параметров не зависит от чтения env.
 func (cfg *Config) validateAddress() error {
 	if strings.TrimSpace(cfg.DatabaseUrl) == "" {
 		return errors.New("DATABASE_URL обязателен")
@@ -126,10 +154,10 @@ func getDuration(key, value string) (time.Duration, error) {
 	return duration, nil
 }
 
-func getInt(key, value string) (int, error) {
+func getInt(key, value string) (int32, error) {
 	number, err := strconv.ParseInt(value, 10, 32)
 	if err != nil {
 		return 0, fmt.Errorf("%s должен быть целым числом в диапазоне int32", key)
 	}
-	return int(number), nil
+	return int32(number), nil
 }

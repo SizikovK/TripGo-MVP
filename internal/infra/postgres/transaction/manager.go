@@ -1,4 +1,4 @@
-package repository
+package transaction
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type txKey struct{}
@@ -18,17 +17,16 @@ type executor interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
 }
 
-type TxManager struct {
-	pool            *pgxpool.Pool
+type Manager struct {
+	pool            database
 	rollbackTimeout time.Duration
 }
 
-func NewTxManager(pool *pgxpool.Pool, rollbackTimeout time.Duration) *TxManager {
-	return &TxManager{pool: pool, rollbackTimeout: rollbackTimeout}
+func New(pool database, rollbackTimeout time.Duration) *Manager {
+	return &Manager{pool: pool, rollbackTimeout: rollbackTimeout}
 }
 
-// Вложенный Do использует текущую транзакцию. Завершает её только внешний Do.
-func (m *TxManager) Do(ctx context.Context, fn func(context.Context) error) (err error) {
+func (m *Manager) Do(ctx context.Context, fn func(context.Context) error) (err error) {
 	if _, ok := ctx.Value(txKey{}).(pgx.Tx); ok {
 		return fn(ctx)
 	}
@@ -36,7 +34,6 @@ func (m *TxManager) Do(ctx context.Context, fn func(context.Context) error) (err
 	if err != nil {
 		return fmt.Errorf("начало транзакции: %w", err)
 	}
-	// Откат нужен и при ошибке, и при панике, даже если запрос уже отменён.
 	defer func() {
 		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), m.rollbackTimeout)
 		defer cancel()
@@ -57,7 +54,7 @@ func (m *TxManager) Do(ctx context.Context, fn func(context.Context) error) (err
 	return nil
 }
 
-func connection(ctx context.Context, pool *pgxpool.Pool) executor {
+func Connection(ctx context.Context, pool executor) executor {
 	if tx, ok := ctx.Value(txKey{}).(pgx.Tx); ok {
 		return tx
 	}
