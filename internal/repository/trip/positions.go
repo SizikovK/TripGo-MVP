@@ -38,3 +38,32 @@ func (r *Repository) SavePosition(ctx context.Context, id uuid.UUID, data model.
 
 	return position, nil
 }
+
+func (r *Repository) ListPositions(ctx context.Context, id uuid.UUID) ([]model.Position, error) {
+	if _, err := r.Get(ctx, id); err != nil {
+		return nil, err
+	}
+
+	rows, err := transaction.Connection(ctx, r.pool).Query(ctx, `
+		SELECT id, trip_id, latitude, longitude, recorded_at
+		FROM trip_positions WHERE trip_id = $1 ORDER BY recorded_at, id`, id)
+	if err != nil {
+		return nil, fmt.Errorf("list positions: %w", err)
+	}
+	defer rows.Close()
+
+	positions := make([]model.Position, 0)
+	for rows.Next() {
+		var position model.Position
+		if err := rows.Scan(&position.ID, &position.TripID, &position.Coordinates.Latitude, &position.Coordinates.Longitude, &position.RecordedAt); err != nil {
+			return nil, fmt.Errorf("scan position: %w", err)
+		}
+
+		positions = append(positions, position)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("read positions: %w", err)
+	}
+
+	return positions, nil
+}
