@@ -2,7 +2,10 @@ package config
 
 import "testing"
 
-const collectorEndpoint = "OTEL_EXPORTER_OTLP_ENDPOINT"
+const (
+	collectorEndpoint = "OTEL_EXPORTER_OTLP_ENDPOINT"
+	pushEndpoint      = "PUSH_HTTP_URL"
+)
 
 func TestFromEnv(t *testing.T) {
 	for _, tc := range []struct {
@@ -22,9 +25,16 @@ func TestFromEnv(t *testing.T) {
 		{name: "overflow", key: "DATABASE_MAX_CONNS", value: "2147483648", invalid: true},
 		{name: "bad port", key: "HTTP_ADDR", value: ":99999", invalid: true},
 		{name: "bad level", key: "LOG_LEVEL", value: "verbose", invalid: true},
+		{name: "missing push", key: pushEndpoint, invalid: true},
+		{name: "bad push", key: pushEndpoint, value: "invalid", invalid: true},
+		{name: "zero workers", key: "POSITION_WORKERS", value: "0", invalid: true},
+		{name: "negative queue", key: "POSITION_QUEUE_SIZE", value: "-1", invalid: true},
+		{name: "bad check interval", key: "POSITION_CHECK_INTERVAL", value: "0s", invalid: true},
+		{name: "bad stale interval", key: "POSITION_STALE_AFTER", value: "invalid", invalid: true},
+		{name: "bad push timeout", key: "PUSH_REQUEST_TIMEOUT", value: "-1s", invalid: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			env := map[string]string{"DATABASE_URL": "postgres://localhost/tripgo", collectorEndpoint: "http://localhost:4317"}
+			env := map[string]string{"DATABASE_URL": "postgres://localhost/tripgo", collectorEndpoint: "http://localhost:4317", pushEndpoint: "http://localhost:8090"}
 			if tc.key != "" {
 				env[tc.key] = tc.value
 			}

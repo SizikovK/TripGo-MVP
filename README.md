@@ -1,8 +1,9 @@
-# TripGo — лабораторная работа 2
+# TripGo — лабораторная работа 3
 
-Сервис создания, получения и завершения поездок. Вторая работа сохраняет HTTP API
-первой и добавляет разделение слоёв, тесты, линтер и OpenTelemetry.
-Контракты и миграции первой работы не изменялись. Бонусное задание не выполнялось.
+Сервис поездок принимает координаты, возвращает маршрут и запрашивает
+отсутствующие координаты через Push Service. В основе — архитектура,
+транзакции и телеметрия предыдущих работ. Контракты и старые миграции
+не изменялись. Дополнительные задания с батчами и приоритетной очередью не выполнялись.
 
 ## Запуск
 
@@ -16,14 +17,15 @@ make migrate
 make run
 ```
 
-`environment.toml` выбирает лабораторную 2 с PostgreSQL и observability.
+`environment.toml` выбирает лабораторную 3 с PostgreSQL, observability и Push Service.
 Адреса БД, коллектора, Jaeger, Prometheus и Grafana берутся из `tripgoctl connect`.
 Используйте сгенерированный `.env`; `.env.example` показывает остальные параметры.
 Не заменяйте свои адреса и секреты примерами из репозитория.
 Порты примера соответствуют проверенному локальному окружению и могут отличаться.
 
-Если `.env` остался от первой работы, обновите `DATABASE_URL` и добавьте
-`OTEL_EXPORTER_OTLP_ENDPOINT` и `OTEL_EXPORTER_OTLP_PROTOCOL` по данным `connect`.
+Если `.env` остался от предыдущих работ, обновите `DATABASE_URL`,
+`OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_PROTOCOL` и `PUSH_HTTP_URL`
+по данным `connect`.
 Для gRPC endpoint записывается как `http://localhost:<порт gRPC>`.
 Переменные процесса имеют приоритет над `.env` при запуске Go-приложения.
 
@@ -58,13 +60,18 @@ internal/container      создание и связывание зависим�
 internal/domain/trip    поездка, валидация, переход статуса, ошибки
 internal/model          типы обмена между слоями
 internal/usecase/trip    create, get, finish
+internal/usecase/position create, list
 internal/http/trip       create, get, finish и преобразование моделей
+internal/http/position   create, list
 internal/http/domainerror преобразование ошибки в Problem
 internal/http/middleware  recover, tracing, logging, metrics
 internal/repository/trip  параметризованные SQL-запросы
 internal/infra/postgres   пул и инструментирование pgx
 internal/infra/postgres/transaction менеджер транзакций
 internal/infra/telemetry  OTLP, логгер и бизнес-метрики
+internal/infra/clock      часы и адаптер тикера для подмены в тестах
+internal/worker/positions сканер, очередь и фиксированный пул воркеров
+internal/gateway/push    HTTP-клиент Push Service
 internal/generated      OpenAPI-код
 ```
 
@@ -136,11 +143,71 @@ UPDATE ждёт окончания первой транзакции. После
 | `OTEL_TRACES_SAMPLER_ARG` | `1` | Доля для `traceidratio` / `parentbased_traceidratio` |
 | `OTEL_METRIC_EXPORT_INTERVAL` | `5000` | Период экспорта в миллисекундах |
 | `OTEL_RESOURCE_ATTRIBUTES` | Стандартные env OTel | Дополнительные атрибуты ресурса |
+| `POSITION_CHECK_INTERVAL` | `30s` | Период проверки и повторного запроса координаты |
+| `POSITION_STALE_AFTER` | `60s` | Сколько времени координата считается свежей |
+| `POSITION_WORKERS` | `4` | Число воркеров |
+| `POSITION_QUEUE_SIZE` | `100` | Вместимость FIFO-канала |
+| `PUSH_HTTP_URL` | Обязателен | Базовый HTTP-адрес Push Service из `connect` |
+| `PUSH_REQUEST_TIMEOUT` | `1s` | Таймаут одной попытки отправки |
 
 По умолчанию ресурс содержит `service.namespace=tripgo` и
 `deployment.environment=local`. Самплеры `always_on`, `always_off` и их
 `parentbased`-варианты также поддерживаются. Длительности должны быть
 положительными, размер пула — `0 <= min <= max`, `max > 0`.
+
+## Опрос устаревших поездок
+
+```text
+тикер → SQL-выборка → ограниченный FIFO-канал → фиксированные воркеры → Push Service
+                         ↑
+              отмена после сохранения координаты
+```
+
+Один сканер раз в `POSITION_CHECK_INTERVAL` выбирает активные поездки,
+у которых `COALESCE(last_position_at, started_at)` старше `POSITION_STALE_AFTER`.
+Условие времени и сортировка по давности находятся в SQL. Выборка без `LIMIT`:
+батчи относятся к дополнительному заданию. Индекс и результат проверки
+на 5000 поездках описаны в [docs/lab03-explain.md](docs/lab03-explain.md).
+
+Очередь вмещает `POSITION_QUEUE_SIZE` задач. Постановка неблокирующая:
+при заполнении задача получает `dropped` и лог Warn. Поездка остаётся в БД
+и снова попадёт в выборку на следующем тике. Отдельного времени отправки пуша
+не храним: паузой между повторными запросами служит период сканера.
+
+Map ожидающих и обрабатываемых задач защищена mutex. Пока задача не завершена,
+повторная постановка даёт `duplicate`. После коммита координаты usecase
+вызывает отмену через интерфейс очереди. Из канала физически извлечь произвольную
+задачу нельзя: воркер пропускает её, если запись в map уже удалена или заменена.
+Проверяется именно экземпляр задачи, поэтому старая отменённая задача не затронет
+новую задачу той же поездки. Уже начавшийся HTTP-вызов отменой ожидающей задачи
+не прерывается.
+
+Воркеров ровно `POSITION_WORKERS`, они не создают горутину на каждую задачу.
+Одна попытка ограничена `PUSH_REQUEST_TIMEOUT`; ошибки Push Service не останавливают
+воркер. HTTP-клиент собственный, запросы строятся сгенерированным клиентом контракта.
+Ретраев и rate limiter в этой работе нет.
+
+Задача хранит SpanContext проверки. Воркер создаёт отдельный корневой спан
+со span link на проверку, а исходящий HTTP-вызов становится его дочерним спаном.
+Контекст сканера не используется как контекст жизни задачи.
+
+При остановке сначала завершается HTTP, затем сканер перестаёт добавлять задачи
+и закрывает канал. Воркеры дорабатывают очередь. После них закрываются
+Push-клиент, телеметрия и пул БД. Бюджет `SHUTDOWN_TIMEOUT` общий для HTTP и
+фоновых компонентов; по его истечении запросы отменяются, процесс принудительно
+завершается. Для сканера и валидации доступны подменяемые тикер и часы.
+
+Дашборд пула: [deploy/grafana/positions.json](deploy/grafana/positions.json).
+После импорта в Grafana откройте `/d/tripgo-lab03`.
+Он показывает размер очереди, занятых воркеров, сохранённые координаты,
+`queued/duplicate/dropped`, результаты пушей и их длительность.
+
+Проверка под нагрузкой: 200 активных поездок, 2 воркера, очередь на 10 задач.
+Задержка Push Service — 5 с, таймаут отправки — 1 с. На скриншоте заняты
+2 воркера, в очереди 6 задач, растёт `dropped`, а вызовы завершаются
+по таймауту примерно через секунду. HTTP-ручки при этом продолжают работать.
+
+![Метрики пула под нагрузкой](docs/images/lab03-pool.png)
 
 ## Телеметрия
 
@@ -169,8 +236,6 @@ SQL инструментируется на уровне пула через `ot
 через Dashboards → New → Import. Используется datasource `prometheus` окружения курса.
 Адреса интерфейсов и учебные реквизиты печатает `tripgoctl connect`.
 
-Результаты проверки: [docs/verification.md](docs/verification.md).
-
 ![Трейс HTTP и PostgreSQL](docs/images/jaeger.png)
 
 ![Метрики TripGo](docs/images/grafana.png)
@@ -182,6 +247,19 @@ GET `/api/v1/trips/{tripId}` возвращает поездку, POST на `/fi
 Ошибки 400/404/409/500 имеют формат `application/problem+json`.
 `/health` отвечает без БД, `/ready` проверяет Ping и отдаёт 200 или 503.
 
+POST `/api/v1/trips/{tripId}/positions` сохраняет точку и возвращает `201`.
+GET по тому же пути возвращает `200` и все точки в порядке `recorded_at`, `id`.
+У существующей поездки без координат ответ — `{"positions":[]}`.
+Сохранение в завершённую поездку даёт `409`, отсутствующая поездка — `404`.
+Координаты вне диапазона, пропущенные поля и время более чем на минуту
+в будущем дают `400`. Старые координаты принимаются.
+
+INSERT точки и обновление `last_position_at` находятся в одной транзакции.
+Сначала условный UPDATE блокирует активную поездку, поэтому завершение
+не может вклиниться между проверкой статуса и записью точки.
+`GREATEST(last_position_at, recorded_at)` сравнивает времена в SQL:
+опоздавшая точка сохраняется в маршрут, но не уменьшает `last_position_at`.
+
 ```bash
 curl -i localhost:8080/ready
 curl -i -X POST localhost:8080/api/v1/trips \
@@ -189,10 +267,28 @@ curl -i -X POST localhost:8080/api/v1/trips \
   -d '{"user_id":"5cb72c04-7650-45c9-a79b-bcdba0631e0c","driver_id":"8860b315-ec86-42eb-a17c-7c163d721ff5","start_point":{"latitude":59.9398,"longitude":30.3146},"end_point":{"latitude":59.929,"longitude":30.3626},"price":1450}'
 ```
 
+Подставьте ID созданной поездки в `TRIP_ID`:
+
+```bash
+TRIP_ID='<id>'
+curl -i -X POST "localhost:8080/api/v1/trips/$TRIP_ID/positions" \
+  -H 'Content-Type: application/json' \
+  -d "{\"coordinates\":{\"latitude\":59.93,\"longitude\":30.33},\"recorded_at\":\"$(date -u +%FT%TZ)\"}"
+curl -i "localhost:8080/api/v1/trips/$TRIP_ID/positions"
+```
+
+Для проверки опроса создайте поездку и не отправляйте координаты.
+После `POSITION_STALE_AFTER` команда появится в логах:
+
+```bash
+tripgoctl environment logs push-service
+```
+
 ## Docker
 
 Сохранена многостадийная сборка и запуск не от root. Для Docker Desktop укажите
-в `.env` `DOCKER_DATABASE_URL` и `DOCKER_OTEL_EXPORTER_OTLP_ENDPOINT` с хостом
+в `.env` `DOCKER_DATABASE_URL`, `DOCKER_OTEL_EXPORTER_OTLP_ENDPOINT` и
+`DOCKER_PUSH_HTTP_URL` с хостом
 `host.docker.internal` и портами БД/коллектора из `connect`, затем `make docker-run`.
 Локальный Go-процесс использует `DATABASE_URL` и `OTEL_EXPORTER_OTLP_ENDPOINT`
 с адресами, доступными компьютеру. Секреты не копируются в образ.

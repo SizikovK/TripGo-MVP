@@ -33,7 +33,9 @@ func newQueryTracer(traces trace.TracerProvider, meters metric.MeterProvider) (*
 	if err != nil {
 		return nil, err
 	}
+
 	base := otelpgx.NewTracer(otelpgx.WithTracerProvider(traces), otelpgx.WithMeterProvider(noop.NewMeterProvider()), otelpgx.WithDisableAcquireTracer())
+
 	return &queryTracer{base: base, duration: duration}, nil
 }
 
@@ -41,6 +43,7 @@ func (t *queryTracer) TraceQueryStart(ctx context.Context, conn *pgx.Conn, data 
 	ctx = t.base.TraceQueryStart(ctx, conn, data)
 	info := queryInfo{started: time.Now(), operation: otelpgx.SQLOperationName(ctx, data.SQL), collection: collectionName(data.SQL)}
 	trace.SpanFromContext(ctx).SetAttributes(attribute.String("db.collection.name", info.collection))
+
 	return context.WithValue(ctx, queryKey{}, info)
 }
 
@@ -52,10 +55,12 @@ func (t *queryTracer) TraceQueryEnd(ctx context.Context, conn *pgx.Conn, data pg
 			errorType = fmt.Sprintf("%T", data.Err)
 			trace.SpanFromContext(ctx).SetAttributes(attribute.String("error.type", errorType))
 		}
+
 		t.duration.Record(ctx, time.Since(info.started).Seconds(), metric.WithAttributes(
 			attribute.String("db.operation.name", info.operation), attribute.String("db.collection.name", info.collection), attribute.String("error.type", errorType),
 		))
 	}
+
 	t.base.TraceQueryEnd(ctx, conn, data)
 }
 
@@ -65,10 +70,12 @@ func collectionName(query string) string {
 		if i+1 >= len(fields) {
 			break
 		}
+
 		switch strings.ToUpper(field) {
 		case "FROM", "INTO", "UPDATE":
 			return strings.Trim(fields[i+1], "\"()")
 		}
 	}
+
 	return ""
 }

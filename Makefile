@@ -23,7 +23,8 @@ migrate: migrate-up
 
 generate:
 	go tool oapi-codegen -config api/oapi-codegen.yaml contracts/openapi/trip-service.openapi.yaml
-	go generate ./internal/usecase/... ./internal/http/trip/...
+	go tool oapi-codegen -config api/push-codegen.yaml contracts/openapi/push-service.openapi.yaml
+	go generate ./internal/usecase/... ./internal/http/... ./internal/worker/...
 
 migrate-up:
 	go tool goose -dir migrations postgres "$$DATABASE_URL" up
@@ -41,4 +42,4 @@ docker-build:
 	docker build -t tripgo .
 
 docker-run: docker-build
-	docker run --rm --env-file .env -e HTTP_ADDR=:8080 -e DATABASE_URL="$$DOCKER_DATABASE_URL" -e OTEL_EXPORTER_OTLP_ENDPOINT="$$DOCKER_OTEL_EXPORTER_OTLP_ENDPOINT" -p 8001:8080 tripgo
+	docker run --rm --env-file .env -e HTTP_ADDR=:8080 -e DATABASE_URL="$$DOCKER_DATABASE_URL" -e OTEL_EXPORTER_OTLP_ENDPOINT="$$DOCKER_OTEL_EXPORTER_OTLP_ENDPOINT" -e PUSH_HTTP_URL="$$DOCKER_PUSH_HTTP_URL" -p 8001:8080 tripgo

@@ -18,10 +18,12 @@ func NewTrips(meter metric.Meter, countActive func(context.Context) (int64, erro
 	if err != nil {
 		return nil, err
 	}
+
 	completed, err := meter.Int64Counter("tripgo.trips.completed", metric.WithUnit("{trip}"))
 	if err != nil {
 		return nil, err
 	}
+
 	_, err = meter.Int64ObservableGauge("tripgo.trips.active", metric.WithUnit("{trip}"), metric.WithInt64Callback(func(ctx context.Context, observer metric.Int64Observer) error {
 		queryCtx, cancel := context.WithTimeout(ctx, timeout)
 		defer cancel()
@@ -30,12 +32,14 @@ func NewTrips(meter metric.Meter, countActive func(context.Context) (int64, erro
 			logger.WarnContext(ctx, "cannot collect active trips", "error", err)
 			return nil
 		}
+
 		observer.Observe(count)
 		return nil
 	}))
 	if err != nil {
 		return nil, err
 	}
+
 	return &Trips{created: created, completed: completed}, nil
 }
 

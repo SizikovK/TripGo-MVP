@@ -35,16 +35,19 @@ func Wrap(next http.Handler, logger *slog.Logger, traces trace.TracerProvider, m
 	if err != nil {
 		return nil, err
 	}
+
 	active, err := meter.Int64UpDownCounter("http.server.active_requests", metric.WithUnit("{request}"))
 	if err != nil {
 		return nil, err
 	}
+
 	next = metrics(next, duration, active)
 	next = logging(next, logger)
 	next = captureContext(next)
 	next = otelhttp.NewHandler(next, "http", otelhttp.WithTracerProvider(traces), otelhttp.WithMeterProvider(noop.NewMeterProvider()),
 		otelhttp.WithPropagators(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{})),
 		otelhttp.WithSpanNameFormatter(func(_ string, r *http.Request) string { return r.Method + " " + route(r) }))
+
 	return recoverPanics(next, logger, route), nil
 }
 
@@ -79,6 +82,7 @@ func logging(next http.Handler, logger *slog.Logger) http.Handler {
 			if info.status >= http.StatusInternalServerError {
 				level = slog.LevelError
 			}
+
 			logger.Log(r.Context(), level, "request handled", "method", r.Method, "route", info.route, "status", info.status,
 				"duration_ms", float64(time.Since(started).Microseconds())/1000)
 		}()
@@ -98,15 +102,18 @@ func metrics(next http.Handler, duration metric.Float64Histogram, active metric.
 			if info.status == 0 {
 				info.status = http.StatusOK
 			}
+
 			if !finished {
 				info.status = http.StatusInternalServerError
 			}
+
 			span := trace.SpanFromContext(r.Context())
 			span.SetAttributes(attribute.String("http.route", info.route), attribute.Int("http.response.status_code", info.status))
 			if info.status >= http.StatusInternalServerError {
 				span.SetStatus(codes.Error, http.StatusText(info.status))
 				span.SetAttributes(attribute.String("error.type", http.StatusText(info.status)))
 			}
+
 			active.Add(r.Context(), -1, metric.WithAttributes(attrs...))
 			attrs = append(attrs, attribute.Int("http.response.status_code", info.status))
 			duration.Record(r.Context(), time.Since(started).Seconds(), metric.WithAttributes(attrs...))

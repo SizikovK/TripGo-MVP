@@ -32,6 +32,7 @@ func Error(w http.ResponseWriter, r *http.Request, logger *slog.Logger, err erro
 		span.SetAttributes(attribute.String("error.type", fmt.Sprintf("%T", err)))
 		logger.ErrorContext(r.Context(), "request failed", "error", err)
 	}
+
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(problem); err != nil {

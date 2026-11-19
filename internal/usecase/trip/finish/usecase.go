@@ -31,19 +31,24 @@ func (u *Usecase) Execute(ctx context.Context, id uuid.UUID) (model.Trip, error)
 		if err != nil {
 			return err
 		}
+
 		if err := record.Finish(time.Now().UTC()); err != nil {
 			return err
 		}
+
 		if err := u.repository.Finish(ctx, record); err != nil {
 			return err
 		}
+
 		from := string(trip.StatusActive)
 		return u.repository.AddHistory(ctx, id, &from, string(trip.StatusCompleted))
 	})
 	if err != nil {
 		return model.Trip{}, fmt.Errorf("finish trip: %w", err)
 	}
+
 	u.metrics.Completed(ctx)
 	u.logger.InfoContext(ctx, "trip completed", "trip_id", id)
+
 	return record, nil
 }

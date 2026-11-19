@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -46,10 +48,22 @@ func TestRequestSignals(t *testing.T) {
 		spans := exporter.GetSpans()
 		require.Len(t, spans, 1)
 		require.Equal(t, "POST /trips/{id}", spans[0].Name)
+		attrs := attribute.NewSet(spans[0].Attributes...)
+		route, ok := attrs.Value("http.route")
+		require.True(t, ok)
+		require.Equal(t, "/trips/{id}", route.AsString())
+		spanStatus, ok := attrs.Value("http.response.status_code")
+		require.True(t, ok)
+		require.EqualValues(t, status, spanStatus.AsInt64())
+		if panics {
+			require.Equal(t, codes.Error, spans[0].Status.Code)
+		}
+
 		require.Contains(t, logs.String(), `"route":"/trips/{id}"`)
 		var result metricdata.ResourceMetrics
 		require.NoError(t, reader.Collect(ctx, &result))
 		found := false
+		activeFound := false
 		for _, scope := range result.ScopeMetrics {
 			for _, signal := range scope.Metrics {
 				if signal.Name == "http.server.request.duration" {
@@ -57,9 +71,20 @@ func TestRequestSignals(t *testing.T) {
 					histogram, ok := signal.Data.(metricdata.Histogram[float64])
 					require.True(t, ok)
 					require.EqualValues(t, 1, histogram.DataPoints[0].Count)
+					metricStatus, ok := histogram.DataPoints[0].Attributes.Value("http.response.status_code")
+					require.True(t, ok)
+					require.EqualValues(t, status, metricStatus.AsInt64())
+				}
+				if signal.Name == "http.server.active_requests" {
+					activeFound = true
+					active, ok := signal.Data.(metricdata.Sum[int64])
+					require.True(t, ok)
+					require.Len(t, active.DataPoints, 1)
+					require.Zero(t, active.DataPoints[0].Value)
 				}
 			}
 		}
 		require.True(t, found)
+		require.True(t, activeFound)
 	}
 }
