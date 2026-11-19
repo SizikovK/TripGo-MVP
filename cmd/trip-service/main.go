@@ -38,8 +38,9 @@ func run() error {
 		return fmt.Errorf("initialize service: %w", err)
 	}
 
+	cleanupCtx := context.WithoutCancel(ctx)
 	defer func() {
-		if err := app.Close(ctx); err != nil {
+		if err := app.Close(cleanupCtx); err != nil {
 			app.Logger.WarnContext(ctx, "cleanup failed", "error", err)
 		}
 	}()
@@ -69,6 +70,7 @@ func run() error {
 		}()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 		defer cancel()
+		cleanupCtx = shutdownCtx
 		if err := app.Server.Shutdown(shutdownCtx); err != nil {
 			return fmt.Errorf("shutdown HTTP: %w", err)
 		}

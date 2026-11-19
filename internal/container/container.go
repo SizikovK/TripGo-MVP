@@ -109,7 +109,12 @@ func (c *Container) Start(ctx context.Context) {
 }
 
 func (c *Container) Close(ctx context.Context) error {
-	cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), c.shutdownTimeout)
+	timeout := c.shutdownTimeout
+	if deadline, ok := ctx.Deadline(); ok {
+		timeout = min(timeout, time.Until(deadline))
+	}
+
+	cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), timeout)
 	defer cancel()
 	var err error
 	if c.Server != nil {
