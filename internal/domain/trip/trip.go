@@ -29,10 +29,11 @@ type Data struct {
 
 type Trip struct {
 	Data
-	ID         uuid.UUID
-	Status     Status
-	StartedAt  time.Time
-	FinishedAt *time.Time
+	ID             uuid.UUID
+	Status         Status
+	StartedAt      time.Time
+	FinishedAt     *time.Time
+	LastPositionAt *time.Time
 }
 
 func (d Data) Validate() error {

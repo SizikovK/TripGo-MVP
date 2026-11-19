@@ -11,7 +11,7 @@ func scanTrip(row pgx.Row) (model.Trip, error) {
 	err := row.Scan(&record.ID, &record.UserID, &record.DriverID,
 		&record.StartPoint.Latitude, &record.StartPoint.Longitude,
 		&record.EndPoint.Latitude, &record.EndPoint.Longitude,
-		&record.Price, &record.Status, &record.StartedAt, &record.FinishedAt)
+		&record.Price, &record.Status, &record.StartedAt, &record.FinishedAt, &record.LastPositionAt)
 
 	return record, err
 }

@@ -81,6 +81,7 @@ func Response(record model.Trip) api.Trip {
 	return api.Trip{
 		Id: record.ID, UserId: record.UserID, DriverId: record.DriverID, Price: record.Price,
 		Status: api.TripStatus(record.Status), StartedAt: record.StartedAt, FinishedAt: record.FinishedAt,
+		LastPositionAt: record.LastPositionAt,
 		StartPoint: api.Coordinates{Latitude: record.StartPoint.Latitude, Longitude: record.StartPoint.Longitude},
 		EndPoint:   api.Coordinates{Latitude: record.EndPoint.Latitude, Longitude: record.EndPoint.Longitude},
 	}

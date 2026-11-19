@@ -15,7 +15,7 @@ import (
 	"github.com/SizikovK/TripGo-MVP/internal/model"
 )
 
-const columns = "id, user_id, driver_id, start_latitude, start_longitude, end_latitude, end_longitude, price, status, started_at, finished_at"
+const columns = "id, user_id, driver_id, start_latitude, start_longitude, end_latitude, end_longitude, price, status, started_at, finished_at, last_position_at"
 
 type Repository struct {
 	pool    database
