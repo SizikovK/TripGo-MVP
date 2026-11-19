@@ -23,7 +23,8 @@ migrate: migrate-up
 
 generate:
 	go tool oapi-codegen -config api/oapi-codegen.yaml contracts/openapi/trip-service.openapi.yaml
-	go generate ./internal/usecase/... ./internal/http/...
+	go tool oapi-codegen -config api/push-codegen.yaml contracts/openapi/push-service.openapi.yaml
+	go generate ./internal/usecase/... ./internal/http/... ./internal/worker/...
 
 migrate-up:
 	go tool goose -dir migrations postgres "$$DATABASE_URL" up
